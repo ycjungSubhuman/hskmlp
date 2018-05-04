@@ -164,7 +164,7 @@ module Neural(
                    -
                    - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
                    -}
-                  weightDiff = pjacobian * (repeatCols (cols pjacobian) nextDiffs)
+                  weightDiff = pjacobian * (repeatCols (cols pjacobian) (invhomo nextDiffs))
                     where
                       {-
                        - pjacobian is a matrix filled with partial derivatives (p is for pseudo)
@@ -175,5 +175,5 @@ module Neural(
                        -
                        - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
                        -}
-                      pjacobian = let x = lastLayerOf prevLayer in jaWeightHidden x values
+                      pjacobian = let x = lastLayerOf prevLayer in jaWeightHidden x (invhomo values)
 
