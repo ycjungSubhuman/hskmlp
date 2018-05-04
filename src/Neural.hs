@@ -28,9 +28,8 @@ module Neural(
     EndLayer :: Network -> Vector Double -> Network
 
   softmax :: Vector Double -> Vector Double
-  softmax v = exp v / (size v) |> [normalizer,normalizer..]
-    where
-      normalizer = (exp v) <.> 1
+  softmax v = (\val -> val / normalizer) `cmap` (exp v)
+    where normalizer = sumElements (exp v)
 
   crossEntropy :: Vector Double -> Vector Double -> Double
   crossEntropy t y = -(sumElements $ (t * (log y)) + ((1 - t) * log (1 - y)))
@@ -101,6 +100,7 @@ module Neural(
     (input, gt):tl -> train learningRate tl improvedNetwork
       where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
 
+  -- Predict softmax values of network
   predict :: Network -> Vector Double -> Vector Double
   predict network input = (lastLayerOf . forward . (feedData input)) network
 
