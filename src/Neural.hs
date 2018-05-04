@@ -30,16 +30,30 @@ module Neural where
 
   sigmoid x = 1.0 / (1 + exp(-x))
 
-  -- Jacobian computations
+  -- Derivation computations
 
   jaSoftmax :: Vector Double -> Matrix Double
-  jaSoftmax smValue = fromList $ (\(i,j) ->
-    if i==j then smValue!i * (1 - smValue!i) else -(smValue!i * smValue!j)
-    ) `map` zip [0..(size x)-1] [0..(size x)-1]
+  jaSoftmax smValue = -(smValue `outer` smValue) + (diag smValue)
 
-  jaSigmoid x = (sigmoid x) * (1 - sigmoid x)
+  {-
+   - jaNodeHidden is a matrix of derivatives
+   -
+   - dy1/dx1 dy1/dx2 ... dy1/dxr
+   -          ...
+   - dyk/dx1 dyk/dx2 ... dyk/dxr
+   -
+   - where yi = sigmoid (sum (weight * xi)), dimension of x is r, dimension of y is k.
+   -}
+  jaNodeHidden :: Matrix Double -> Vector Double -> Matrix Double
+  jaNodeHidden weights y = weights * (repeatCols (cols weights) jaSigmoid)
+    where
+      jaSigmoid = (sigmoid y) * (1 - sigmoid y)
 
-  jaLinear x = x
+  jaWeightHidden :: Vector Double -> Vector Double -> Matrix Double
+  jaWeightHidden x y = jaSigmoid `outer` jaLinear
+    where
+      jaSigmoid = (sigmoid y) * (1 - sigmoid y)
+      jaLinear = x
 
   jaCrossEntropy :: Vector Double -> Vector Double -> Vector Double
   jaCrossEntropy t y = fromList $ (\i -> (t!i / y!i) - ((1 - t!i) / (1 - y!i))) `map` [0..(size y)-1]
@@ -94,12 +108,54 @@ module Neural where
               lastVector = lastLayerOf prevResult
 
   -- Backpropagate errors to update weights of Network. Leaves values of layers unchanged
+  -- Uses stochastic gradient descent
   backward eta gt (EndLayer prevLayer value) =
-    EndLayer (innerBackward $ prevLayer ((jaSoftmax value) #> (jaCrossEntropy value gt))) value
+    EndLayer (innerBackward prevLayer lastDiff) value
       where
-        innerBackward network nextJ = case network of
+        {-
+         - lastDiff is a vector of partial derivatives
+         -
+         - [dL/dY1 ... dL/dYk 1]
+         -
+         - where last softmax layer is k-dimension.
+         - The hidden layer right before this softmax layer has k+1 dimension since it has '1' at the end.
+         -}
+        lastDiff = homo $ (jaSoftmax value) #> (jaCrossEntropy value gt)
+
+        innerBackward :: Network -> Vector Double -> Network
+        innerBackward network nextDiffs = case network of
           StartLayer d -> StartLayer d
-          HiddenLayer prevLayer _ values -> HiddenLayer (innerBackward prevLayer jacobian) neweights values
+          HiddenLayer prevLayer weights values -> HiddenLayer (innerBackward prevLayer currDiff) newWeights values
             where
-              jacobian = nextJ
-              newweights = 
+              {-
+               - currDiff is a vector of partial derivatives
+               -
+               - [dL/dX1 ... dL/dXr]
+               -
+               - where X is the output of previous layer
+               -}
+              currDiff = (tr (jaNodeHidden weights values)) #> nextDiffs
+              newWeights = weights - (eta * weightDiff)
+                where
+                  {-
+                   - weightDiff is a matrix filled with partial derivatives
+                   -
+                   -  dL/dW11  dL/dW12 ...  dL/dW1r
+                   -               ...
+                   -  dL/dWk1  dL/dWk2 ...  dL/dWkr
+                   -
+                   - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
+                   -}
+                  weightDiff = pjacobian * (repeatCols (cols pjacobian) nextDiffs)
+                    where
+                      {-
+                       - pjacobian is a matrix filled with partial derivatives (p is for pseudo)
+                       -
+                       -  dY1/dW11  dY1/dW12 ...  dY1/dW1r
+                       -               ...
+                       -  dYk/dWk1  dYk/dWk2 ...  dYk/dWkr
+                       -
+                       - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
+                       -}
+                      pjacobian = let x = lastLayerOf prevLayer in jaWeightHidden x values
+

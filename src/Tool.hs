@@ -13,3 +13,5 @@ module Tool where
   invhomo :: Vector Double -> Vector Double
   invhomo v = subVector 0 (size v - 1) v
 
+  repeatCols :: Int -> Vector Double -> Matrix Double
+  repeatCols n v = repmat (asColumn v) 1 n
