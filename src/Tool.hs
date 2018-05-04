@@ -24,3 +24,7 @@ module Tool where
   labelEquals a b = (argmax $ toList a) == (argmax $ toList b)
 
   argmax l = case elemIndex (maximum l) l of Just result -> result
+
+  -- split a list into two lists
+  split l = [take halfLength l, drop halfLength l]
+    where halfLength = length l `quot` 2

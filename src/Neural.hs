@@ -101,8 +101,8 @@ module Neural(
     (input, gt):tl -> train learningRate tl improvedNetwork
       where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
 
-  predict :: Vector Double -> Network -> Vector Double
-  predict input network = (lastLayerOf . forward . (feedData input)) network
+  predict :: Network -> Vector Double -> Vector Double
+  predict network input = (lastLayerOf . forward . (feedData input)) network
 
   -- Prepare Network with input
   feedData :: Vector Double -> Network -> Network
