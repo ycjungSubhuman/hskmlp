@@ -27,13 +27,25 @@ library:
   source-dirs: src
 
 executables:
-  homework3-exe:
-    main:                Main.hs
+  Twomoon:
+    main:                TwoMoon.hs
     source-dirs:         app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -main-is TwoMoon
+    dependencies:
+    - homework3
+
+  Mnist:
+    main:                Mnist.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -main-is Mnist
     dependencies:
     - homework3
 

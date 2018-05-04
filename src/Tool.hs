@@ -1,5 +1,6 @@
 module Tool where
   import Numeric.LinearAlgebra
+  import Data.List
 
   zeros n = n |> [0,0..]
 
@@ -15,3 +16,11 @@ module Tool where
 
   repeatCols :: Int -> Vector Double -> Matrix Double
   repeatCols n v = repmat (asColumn v) 1 n
+
+  stepLabel :: Vector Double -> Int
+  stepLabel v = argmax (toList v)
+
+  labelEquals :: Vector Double -> Vector Double -> Bool
+  labelEquals a b = (argmax $ toList a) == (argmax $ toList b)
+
+  argmax l = case elemIndex (maximum l) l of Just result -> result

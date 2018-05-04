@@ -1,10 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 
-module Neural where
+module Neural(
+             Example,
+             initNetwork,
+             train,
+             predict
+             ) where
 
   import Numeric.LinearAlgebra
   import Tool
+
+  type Example = (Vector Double, Vector Double)
 
   -- Fully connected neural network described in ADT
   data Network where
@@ -87,6 +94,16 @@ module Neural where
     HiddenLayer _ _ value -> value
     EndLayer _ value -> value
 
+  -- Train FC neural network with examples
+  train :: Double -> [Example] -> Network -> Network
+  train learningRate examples network = case examples of
+    [] -> network
+    (input, gt):tl -> train learningRate tl improvedNetwork
+      where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
+
+  predict :: Vector Double -> Network -> Vector Double
+  predict input network = (lastLayerOf . forward . (feedData input)) network
+
   -- Prepare Network with input
   feedData :: Vector Double -> Network -> Network
   feedData input network = case network of
@@ -109,7 +126,8 @@ module Neural where
 
   -- Backpropagate errors to update weights of Network. Leaves values of layers unchanged
   -- Uses stochastic gradient descent
-  backward eta gt (EndLayer prevLayer value) =
+  backward :: Double -> Vector Double -> Network -> Network
+  backward learningRate gt (EndLayer prevLayer value) =
     EndLayer (innerBackward prevLayer lastDiff) value
       where
         {-
@@ -135,7 +153,7 @@ module Neural where
                - where X is the output of previous layer
                -}
               currDiff = (tr (jaNodeHidden weights values)) #> nextDiffs
-              newWeights = weights - (eta * weightDiff)
+              newWeights = weights - ((\w -> w*learningRate) `cmap` weightDiff)
                 where
                   {-
                    - weightDiff is a matrix filled with partial derivatives
