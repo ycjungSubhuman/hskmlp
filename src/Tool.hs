@@ -1,10 +1,23 @@
 module Tool where
   import Numeric.LinearAlgebra
   import Data.List
+  import System.Random
 
   zeros n = n |> [0,0..]
 
+  ones n = n |> [1,1..]
+
+  rands range n = do
+    randarr <- (getStdGen >>= (return.randomRs range))
+    return $ n |> randarr
+
   zeromat n m = (n><m) [0,0..]
+
+  onemat n m = (n><m) [1,1..]
+
+  randmat range n m = do
+    randarr <- (getStdGen >>= (return.randomRs range))
+    return $ (n><m) randarr
 
   -- append 1 at the end
   homo :: Vector Double -> Vector Double

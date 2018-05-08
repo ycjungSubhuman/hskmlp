@@ -2,19 +2,19 @@ module Test where
 
   import Numeric.LinearAlgebra
   import Data.List
+  import Debug.Trace
 
   import Neural
   import Tool
 
   runSuite :: Double -> [Int] -> ([Example], [Example], [Example]) -> IO ()
   runSuite learningRate hiddenDims (training, validation, test) = do
+    initialNetwork <- initNetwork hiddenDims (size $ (fst.head) training)
+    let network = train learningRate training initialNetwork
     putStrLn "Validation Phrase"
     runTest validation (predict network)
     putStrLn "Test Phrase"
     runTest test (predict network)
-      where
-        network = train learningRate training initialNetwork
-          where initialNetwork = initNetwork hiddenDims (size $ (fst.head) training)
 
   -- Prints Test result to stdout
   runTest :: [Example] -> (Vector Double -> Vector Double) -> IO ()
@@ -32,6 +32,7 @@ module Test where
 
   -- Row for prediction, col for ground truth
   getConfusion :: [Vector Double] -> [Vector Double] -> Matrix Double
+  getConfusion pred gts | trace ("getConfusion " ++ show pred ++ " " ++ show gts) False = undefined
   getConfusion pred gts =
     accum (zeromat width height) (+) ((\p -> (p, 1)) `map` pts)
       where

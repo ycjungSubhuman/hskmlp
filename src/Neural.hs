@@ -9,6 +9,9 @@ module Neural(
              ) where
 
   import Numeric.LinearAlgebra
+  import System.Random
+  import Debug.Trace
+
   import Tool
 
   type Example = (Vector Double, Vector Double)
@@ -26,6 +29,7 @@ module Neural(
     -- 1. network subset that comes before this layer
     -- 2. current softmax value (homogeneous)
     EndLayer :: Network -> Vector Double -> Network
+    deriving (Show)
 
   softmax :: Vector Double -> Vector Double
   softmax v = (\val -> val / normalizer) `cmap` (exp v)
@@ -55,6 +59,15 @@ module Neural(
     where
       jaSigmoid = (sigmoid y) * (1 - sigmoid y)
 
+  {-
+   - jaWeightHidden is a matrix of derivatives
+   -
+   - dy1/dw11 dy1/dw12 ... dy1/dw1r
+   -          ...
+   - dyk/dwk1 dyk/dwk2 ... dyk/dwkr
+   -
+   - where yi = sigmoid (sum (wij * xj)), dimension of x is r, dimension of y is k.
+   -}
   jaWeightHidden :: Vector Double -> Vector Double -> Matrix Double
   jaWeightHidden x y = jaSigmoid `outer` jaLinear
     where
@@ -62,28 +75,34 @@ module Neural(
       jaLinear = x
 
   jaCrossEntropy :: Vector Double -> Vector Double -> Vector Double
+  --jaCrossEntropy t y | trace ("jaCrossEntropy " ++ show t ++ " " ++ show y) False = undefined
   jaCrossEntropy t y = fromList $ (\i -> (t!i / y!i) - ((1 - t!i) / (1 - y!i))) `map` [0..(size y)-1]
 
-  -- Initialize network with zero weights and zero values
+  -- Initialize network with random weights and zero values
   -- The first argument is dimension of hidden layers. 0th element represents dimension of the last hidden layer
   -- The second argument is dimension of input layer.
   -- length of hiddenDims should be larger than or equal to 1
-  initNetwork :: [Int] -> Int -> Network
-  initNetwork hiddenDims inputDim =
-    EndLayer
-      (initInnerNetwork hiddenDims inputDim)
+  initNetwork :: [Int] -> Int -> IO Network
+  initNetwork hiddenDims inputDim = do
+    inner <- initInnerNetwork hiddenDims inputDim
+    return $ EndLayer
+      inner
       (zeros $ head hiddenDims)
       where
+        initInnerNetwork :: [Int] -> Int -> IO Network
         initInnerNetwork hiddenDims inputDim =
-          if 1 == length hiddenDims then
-            HiddenLayer
-              (StartLayer (homo $ zeros inputDim))
-              (zeromat (head hiddenDims) (inputDim+1)) -- col+1 for bias
+          if 1 == length hiddenDims then do
+            randWeight <- randmat (-0.1, 0.1) (head hiddenDims) (inputDim+1) -- col+1 for bias
+            return $ HiddenLayer
+              (StartLayer (homo $ ones inputDim))
+              randWeight
               (homo $ zeros (head hiddenDims)) -- append 1 for bias
-          else
-            HiddenLayer
-              (initInnerNetwork (tail hiddenDims) inputDim)
-              (zeromat (head hiddenDims) (head (tail hiddenDims) + 1)) -- col+1 for bias
+          else do
+            randWeight <- randmat (-0.1, 0.1) (head hiddenDims) (head (tail hiddenDims) + 1) -- col+1 for bias
+            prevLayer <- (initInnerNetwork (tail hiddenDims) inputDim)
+            return $ HiddenLayer
+              prevLayer
+              randWeight
               (homo $ zeros (last hiddenDims)) -- append 1 for bias
 
   -- Get a vector value of the last layer of the network
@@ -95,6 +114,7 @@ module Neural(
 
   -- Train FC neural network with examples
   train :: Double -> [Example] -> Network -> Network
+  --train _ _ network | trace ("train " ++ show network) False = undefined
   train learningRate examples network = case examples of
     [] -> network
     (input, gt):tl -> train learningRate tl improvedNetwork
@@ -102,6 +122,7 @@ module Neural(
 
   -- Predict softmax values of network
   predict :: Network -> Vector Double -> Vector Double
+  --predict network input | trace ("predict " ++ show network ++ " " ++ show input) False = undefined
   predict network input = (lastLayerOf . forward . (feedData input)) network
 
   -- Prepare Network with input
@@ -114,6 +135,7 @@ module Neural(
   -- Forward data to update values of Network. Leaves weights of layers unchanged.
   -- Use this for prediction
   forward :: Network -> Network
+  --forward network | trace ("forward " ++ show network) False = undefined
   forward network = case network of
     StartLayer d -> StartLayer d
     HiddenLayer prevLayer weights _ ->
@@ -138,7 +160,7 @@ module Neural(
          - where last softmax layer is k-dimension.
          - The hidden layer right before this softmax layer has k+1 dimension since it has '1' at the end.
          -}
-        lastDiff = homo $ (jaSoftmax value) #> (jaCrossEntropy value gt)
+        lastDiff = homo $ (jaSoftmax value) #> (jaCrossEntropy gt value)
 
         innerBackward :: Network -> Vector Double -> Network
         innerBackward network nextDiffs = case network of
