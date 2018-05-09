@@ -66,5 +66,5 @@ packages:
 # compiler-check: newer-minor
 build:
   library-profiling: true
-  exacutable-profiling: true
+  executable-profiling: true
 

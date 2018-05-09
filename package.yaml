@@ -23,12 +23,14 @@ dependencies:
 - base >= 4.7 && < 5
 - hmatrix
 - random
+- binary
+- bytestring
 
 library:
   source-dirs: src
 
 executables:
-  Twomoon:
+  TwoMoon:
     main:                TwoMoon.hs
     source-dirs:         app
     ghc-options:
@@ -36,6 +38,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -main-is TwoMoon
+    - -O2
     dependencies:
     - homework3
 
@@ -47,6 +50,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -main-is Mnist
+    - -O2
     dependencies:
     - homework3
 

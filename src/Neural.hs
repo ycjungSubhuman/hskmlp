@@ -28,22 +28,22 @@ module Neural(
     -- End layer : softmax layer. consists of three elements
     -- 1. network subset that comes before this layer
     -- 2. current softmax value (homogeneous)
-    EndLayer :: Network -> Vector Double -> Network
+    -- 3. current loss of training
+    EndLayer :: Network -> Vector Double -> Double -> Network
     deriving (Show)
+
+  {- Activations and loss -}
 
   softmax :: Vector Double -> Vector Double
   softmax v = (\val -> val / normalizer) `cmap` (exp v)
     where normalizer = sumElements (exp v)
 
   crossEntropy :: Vector Double -> Vector Double -> Double
-  crossEntropy t y = -(sumElements $ (t * (log y)) + ((1 - t) * log (1 - y)))
+  crossEntropy t y = -(sumElements $ (t * (log y)))
 
-  sigmoid x = 1.0 / (1 + exp(-x))
+  activation x = tanh x
 
-  -- Derivation computations
-
-  jaSoftmax :: Vector Double -> Matrix Double
-  jaSoftmax smValue = -(smValue `outer` smValue) + (diag smValue)
+  {- Derivation computations -}
 
   {-
    - jaNodeHidden is a matrix of derivatives
@@ -52,12 +52,12 @@ module Neural(
    -          ...
    - dyk/dx1 dyk/dx2 ... dyk/dxr
    -
-   - where yi = sigmoid (sum (weight * xi)), dimension of x is r, dimension of y is k.
+   - where yi = activation (sum (weight * xj)), dimension of x is r, dimension of y is k.
    -}
   jaNodeHidden :: Matrix Double -> Vector Double -> Matrix Double
-  jaNodeHidden weights y = weights * (repeatCols (cols weights) jaSigmoid)
+  jaNodeHidden weights y = weights * (repeatCols (cols weights) jaActivation)
     where
-      jaSigmoid = (sigmoid y) * (1 - sigmoid y)
+      jaActivation = 1 - (y^2)
 
   {-
    - jaWeightHidden is a matrix of derivatives
@@ -66,20 +66,23 @@ module Neural(
    -          ...
    - dyk/dwk1 dyk/dwk2 ... dyk/dwkr
    -
-   - where yi = sigmoid (sum (wij * xj)), dimension of x is r, dimension of y is k.
+   - where yi = activation (sum (wij * xj)), dimension of x is r, dimension of y is k.
    -}
   jaWeightHidden :: Vector Double -> Vector Double -> Matrix Double
-  jaWeightHidden x y = jaSigmoid `outer` jaLinear
+  jaWeightHidden x y = jaActivation `outer` jaLinear
     where
-      jaSigmoid = (sigmoid y) * (1 - sigmoid y)
+      jaActivation = 1 - (y^2)
       jaLinear = x
 
-  jaCrossEntropy :: Vector Double -> Vector Double -> Vector Double
-  --jaCrossEntropy t y | trace ("jaCrossEntropy " ++ show t ++ " " ++ show y) False = undefined
-  jaCrossEntropy t y = fromList $ (\i -> (t!i / y!i) - ((1 - t!i) / (1 - y!i))) `map` [0..(size y)-1]
+  -- Derivatives of softmax-crossentropy loss function
+  jaLoss t y = y - t
+
+  {- Network handling-}
 
   -- Initialize network with random weights and zero values
-  -- The first argument is dimension of hidden layers. 0th element represents dimension of the last hidden layer
+  -- The first argument is dimension of hidden layers.
+  --   0th element represents dimension of the last hidden layer.
+  --   0th element should be equal to the number of classes
   -- The second argument is dimension of input layer.
   -- length of hiddenDims should be larger than or equal to 1
   initNetwork :: [Int] -> Int -> IO Network
@@ -88,17 +91,18 @@ module Neural(
     return $ EndLayer
       inner
       (zeros $ head hiddenDims)
+      0.0
       where
         initInnerNetwork :: [Int] -> Int -> IO Network
         initInnerNetwork hiddenDims inputDim =
           if 1 == length hiddenDims then do
-            randWeight <- randmat (-0.1, 0.1) (head hiddenDims) (inputDim+1) -- col+1 for bias
+            randWeight <- randmat (-0.5, 0.5) (head hiddenDims) (inputDim+1) -- col+1 for bias
             return $ HiddenLayer
               (StartLayer (homo $ ones inputDim))
               randWeight
               (homo $ zeros (head hiddenDims)) -- append 1 for bias
           else do
-            randWeight <- randmat (-0.1, 0.1) (head hiddenDims) (head (tail hiddenDims) + 1) -- col+1 for bias
+            randWeight <- randmat (-0.5, 0.5) (head hiddenDims) (head (tail hiddenDims) + 1) -- col+1 for bias
             prevLayer <- (initInnerNetwork (tail hiddenDims) inputDim)
             return $ HiddenLayer
               prevLayer
@@ -110,19 +114,21 @@ module Neural(
   lastLayerOf network = case network of
     StartLayer d -> d
     HiddenLayer _ _ value -> value
-    EndLayer _ value -> value
+    EndLayer _ value _ -> value
+
+  -- Train FC neural network 'epoch' times using given examples
+  train :: Int -> Double -> [Example] -> Network -> Network
+  train epoch learningRate examples network = (iterate (trainEpoch learningRate examples) network)!!epoch
 
   -- Train FC neural network with examples
-  train :: Double -> [Example] -> Network -> Network
-  --train _ _ network | trace ("train " ++ show network) False = undefined
-  train learningRate examples network = case examples of
+  trainEpoch :: Double -> [Example] -> Network -> Network
+  trainEpoch learningRate examples network = case examples of
     [] -> network
-    (input, gt):tl -> train learningRate tl improvedNetwork
+    (input, gt):tl -> trainEpoch learningRate tl improvedNetwork
       where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
 
   -- Predict softmax values of network
   predict :: Network -> Vector Double -> Vector Double
-  --predict network input | trace ("predict " ++ show network ++ " " ++ show input) False = undefined
   predict network input = (lastLayerOf . forward . (feedData input)) network
 
   -- Prepare Network with input
@@ -130,37 +136,36 @@ module Neural(
   feedData input network = case network of
     StartLayer d -> StartLayer $ homo input
     HiddenLayer prevLayer weights value -> HiddenLayer (feedData input prevLayer) weights value
-    EndLayer prevLayer value -> EndLayer (feedData input prevLayer) value
+    EndLayer prevLayer value loss -> EndLayer (feedData input prevLayer) value loss
 
   -- Forward data to update values of Network. Leaves weights of layers unchanged.
   -- Use this for prediction
   forward :: Network -> Network
-  --forward network | trace ("forward " ++ show network) False = undefined
   forward network = case network of
     StartLayer d -> StartLayer d
     HiddenLayer prevLayer weights _ ->
-      HiddenLayer prevResult weights (homo (sigmoid (weights #> lastLayerOf prevResult)))
+      HiddenLayer prevResult weights (homo (activation (weights #> lastLayerOf prevResult)))
         where prevResult = forward prevLayer
-    EndLayer prevLayer _ ->
-      EndLayer prevResult (softmax $ invhomo lastVector) -- remove the last element since it is meaningless
+    EndLayer prevLayer _ loss ->
+      EndLayer prevResult (softmax $ invhomo lastVector) loss -- remove the last element since it is meaningless
         where prevResult = forward prevLayer
               lastVector = lastLayerOf prevResult
 
   -- Backpropagate errors to update weights of Network. Leaves values of layers unchanged
   -- Uses stochastic gradient descent
   backward :: Double -> Vector Double -> Network -> Network
-  backward learningRate gt (EndLayer prevLayer value) =
-    EndLayer (innerBackward prevLayer lastDiff) value
+  backward learningRate gt (EndLayer prevLayer value _) =
+    EndLayer (innerBackward prevLayer lastDiff) value loss
       where
         {-
          - lastDiff is a vector of partial derivatives
          -
-         - [dL/dY1 ... dL/dYk 1]
+         - [dL/dY1 ... dL/dYk]
          -
          - where last softmax layer is k-dimension.
-         - The hidden layer right before this softmax layer has k+1 dimension since it has '1' at the end.
          -}
-        lastDiff = homo $ (jaSoftmax value) #> (jaCrossEntropy gt value)
+        lastDiff = jaLoss gt value
+        loss = crossEntropy gt value
 
         innerBackward :: Network -> Vector Double -> Network
         innerBackward network nextDiffs = case network of
@@ -174,7 +179,7 @@ module Neural(
                -
                - where X is the output of previous layer
                -}
-              currDiff = (tr (jaNodeHidden weights values)) #> nextDiffs
+              currDiff = (invhomo . flatten) $ ((jaNodeHidden weights (invhomo values)) * (repeatCols (cols weights) nextDiffs)) ? [0]
               newWeights = weights - ((\w -> w*learningRate) `cmap` weightDiff)
                 where
                   {-
@@ -186,7 +191,7 @@ module Neural(
                    -
                    - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
                    -}
-                  weightDiff = pjacobian * (repeatCols (cols pjacobian) (invhomo nextDiffs))
+                  weightDiff = pjacobian * (repeatCols (cols pjacobian) nextDiffs)
                     where
                       {-
                        - pjacobian is a matrix filled with partial derivatives (p is for pseudo)

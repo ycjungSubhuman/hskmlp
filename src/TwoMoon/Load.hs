@@ -3,6 +3,7 @@ module TwoMoon.Load where
   import Neural
   import Numeric.LinearAlgebra
 
+  -- Parse two-moon dataset into a list of examples (pairs of a list of feature and a list of labels)
   loadExamples :: IO [Example]
   loadExamples = do
     twomoon <- loadMatrix "data/two_moon.txt"

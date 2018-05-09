@@ -7,21 +7,24 @@ module Test where
   import Neural
   import Tool
 
-  runSuite :: Double -> [Int] -> ([Example], [Example], [Example]) -> IO ()
-  runSuite learningRate hiddenDims (training, validation, test) = do
+  {- Network test codes-}
+
+  -- Train a network and run validation and test
+  runSuite :: Int -> Double -> [Int] -> ([Example], [Example], [Example]) -> IO ()
+  runSuite epoch learningRate hiddenDims (training, validation, test) = do
     initialNetwork <- initNetwork hiddenDims (size $ (fst.head) training)
-    let network = train learningRate training initialNetwork
-    putStrLn "Validation Phrase"
+    let network = train epoch learningRate training initialNetwork
+    putStrLn "Validation Phase"
     runTest validation (predict network)
-    putStrLn "Test Phrase"
+    putStrLn "Test Phase"
     runTest test (predict network)
 
-  -- Prints Test result to stdout
+  -- Run test with given examples
   runTest :: [Example] -> (Vector Double -> Vector Double) -> IO ()
   runTest examples predictFunction =
     do
       putStrLn "Confusion Matrix : "
-      disp 6 $ confusion
+      disp 6 confusion
       putStr "Precision : "
       putStrLn $ show (getPrecision confusion)
         where
@@ -30,9 +33,10 @@ module Test where
               predictions = (predictFunction . fst) `map` examples
               gts = snd `map` examples
 
+  -- Generate confusion matrix
   -- Row for prediction, col for ground truth
   getConfusion :: [Vector Double] -> [Vector Double] -> Matrix Double
-  getConfusion pred gts | trace ("getConfusion " ++ show pred ++ " " ++ show gts) False = undefined
+  --getConfusion pred gts | trace ("getConfusion " ++ show pred ++ " " ++ show gts) False = undefined
   getConfusion pred gts =
     accum (zeromat width height) (+) ((\p -> (p, 1)) `map` pts)
       where
@@ -45,14 +49,14 @@ module Test where
   getPrecision confusion = (sumElements $ takeDiag confusion) / (sumElements confusion)
 
   -- Splits examples into test/validation/test sets
-  -- Use half of dataset as training set.
-  -- Use the other half as validation/training, equally divided.
-  splitDataSet :: [Example] -> [([Example], [Example], [Example])]
-  splitDataSet wholeData = do
-      [l, r] <- halfPermutations wholeData
-      [r_l, r_r] <- halfPermutations r
-      return (l, r_l, r_r)
-        where
-          halfPermutations l = permutations $ split l
+  splitDataSet :: [Example] -> ([Example], [Example], [Example])
+  splitDataSet wholeData = (training, validation, test)
+    where
+      half = length wholeData `quot` 2
+      valLen  = 2 * (length wholeData `quot` 10)
+      testLen  = 3 * (length wholeData `quot` 10)
 
+      training = take half wholeData
+      validation = ((take valLen) . (drop half)) wholeData
+      test = ((take testLen) . (drop valLen) . (drop half)) wholeData
 

@@ -1,0 +1,15 @@
+[ycjung@yucheol-pc homework3]$ stack exec -- TwoMoon 0.02 1000
+20 10 2
+Validation Phrase
+Confusion Matrix : 
+2x2
+16   6
+ 4  14
+Precision : 0.75
+Test Phrase
+Confusion Matrix : 
+2x2
+24   3
+ 8  25
+Precision : 0.8166666666666667
+

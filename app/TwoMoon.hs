@@ -11,9 +11,10 @@ module TwoMoon where
   main = do
     twomoon <- loadExamples
     learningRate <- (getArgs >>= (\args -> (return.read) $ head args))
-    let dataSets = splitDataSet twomoon
-    runSuite learningRate networkSetting `mapM_` dataSets
+    epoch <- (getArgs >>= (\args -> (return.read) $ args!!1))
+    let dataSet = splitDataSet twomoon
+    runSuite epoch learningRate networkSetting dataSet
 
-  -- one hidden layer with 2 nodes
-  networkSetting = [2]
+  -- two hidden layer with 20, 10 nodes each
+  networkSetting = [2, 4]
 
