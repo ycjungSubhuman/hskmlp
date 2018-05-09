@@ -17,7 +17,9 @@ Empirically 0.03, 1000 gives the best results.
 
 * `stack exec -- Mnist \<learningRate\> \<epochs\>` will run a demo program that runs training/validation/test for MNIST dataset
 
-Empirically 0.03, 20 gives the best results. (This takes about 6 hours on Intel i7-2600)
+Empirically 0.03, 6 gives the best results. (This takes about 2 hours on Intel i7-2600)
+
+Note that this implementation requires a lot of memory(about 7GB in my computer)
 
 
 ## Dataset

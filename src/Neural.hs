@@ -124,7 +124,7 @@ module Neural(
   trainEpoch :: Double -> [Example] -> Network -> Network
   trainEpoch learningRate examples network = case examples of
     [] -> network
-    (input, gt):tl -> trainEpoch learningRate tl improvedNetwork
+    (input, gt):tl -> improvedNetwork `seq` trainEpoch learningRate tl improvedNetwork
       where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
 
   -- Predict softmax values of network
@@ -155,7 +155,7 @@ module Neural(
   -- Uses stochastic gradient descent
   backward :: Double -> Vector Double -> Network -> Network
   backward learningRate gt (EndLayer prevLayer value _) =
-    gt `seq` EndLayer (innerBackward prevLayer lastDiff) value loss
+    EndLayer (innerBackward prevLayer lastDiff) value loss
       where
         {-
          - lastDiff is a vector of partial derivatives
