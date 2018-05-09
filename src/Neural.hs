@@ -11,6 +11,7 @@ module Neural(
   import Numeric.LinearAlgebra
   import System.Random
   import Debug.Trace
+  import Data.List
 
   import Tool
 
@@ -122,10 +123,10 @@ module Neural(
 
   -- Train FC neural network with examples
   trainEpoch :: Double -> [Example] -> Network -> Network
-  trainEpoch learningRate examples network = case examples of
-    [] -> network
-    (input, gt):tl -> improvedNetwork `seq` trainEpoch learningRate tl improvedNetwork
-      where improvedNetwork = ((backward learningRate gt) . forward . (feedData input)) network
+  trainEpoch learningRate examples network =
+    foldl' (\acc (input, gt) ->
+      ((backward learningRate gt) . forward . (feedData input)) acc
+      ) network examples
 
   -- Predict softmax values of network
   predict :: Network -> Vector Double -> Vector Double
@@ -144,10 +145,11 @@ module Neural(
   forward network = case network of
     StartLayer d -> StartLayer d
     HiddenLayer prevLayer weights _ ->
-      HiddenLayer prevResult weights (homo (activation (weights #> lastLayerOf prevResult)))
+      value `seq` HiddenLayer prevResult weights value
         where prevResult = forward prevLayer
+              value = (homo (activation (weights #> lastLayerOf prevResult)))
     EndLayer prevLayer _ loss ->
-      EndLayer prevResult (softmax $ invhomo lastVector) loss -- remove the last element since it is meaningless
+      lastVector `seq` EndLayer prevResult (softmax $ invhomo lastVector) loss -- remove the last element since it is meaningless
         where prevResult = forward prevLayer
               lastVector = lastLayerOf prevResult
 
@@ -170,7 +172,7 @@ module Neural(
         innerBackward :: Network -> Vector Double -> Network
         innerBackward network nextDiffs = case network of
           StartLayer d -> StartLayer d
-          HiddenLayer prevLayer weights values -> HiddenLayer (innerBackward prevLayer currDiff) newWeights values
+          HiddenLayer prevLayer weights values -> newWeights `seq` HiddenLayer (innerBackward prevLayer currDiff) newWeights values
             where
               {-
                - currDiff is a vector of partial derivatives
@@ -180,7 +182,7 @@ module Neural(
                - where X is the output of previous layer
                -}
               currDiff = (invhomo . flatten) $ ((jaNodeHidden weights (invhomo values)) * (repeatCols (cols weights) nextDiffs)) ? [0]
-              newWeights = weights - ((\w -> w*learningRate) `cmap` weightDiff)
+              newWeights = weightDiff `seq` (weights - ((\w -> w*learningRate) `cmap` weightDiff))
                 where
                   {-
                    - weightDiff is a matrix filled with partial derivatives
@@ -191,7 +193,7 @@ module Neural(
                    -
                    - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
                    -}
-                  weightDiff = pjacobian * (repeatCols (cols pjacobian) nextDiffs)
+                  weightDiff = pjacobian `seq` (pjacobian * (repeatCols (cols pjacobian) nextDiffs))
                     where
                       {-
                        - pjacobian is a matrix filled with partial derivatives (p is for pseudo)
@@ -202,5 +204,5 @@ module Neural(
                        -
                        - where this hidden layer have 'k' nodes and previous layer has 'r' nodes
                        -}
-                      pjacobian = let x = lastLayerOf prevLayer in jaWeightHidden x (invhomo values)
+                      pjacobian = let x = lastLayerOf prevLayer in x `seq` jaWeightHidden x (invhomo values)
 
