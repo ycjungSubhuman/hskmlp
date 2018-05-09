@@ -50,7 +50,7 @@ module Test where
 
   -- Splits examples into test/validation/test sets
   splitDataSet :: [Example] -> ([Example], [Example], [Example])
-  splitDataSet wholeData = (training, validation, test)
+  splitDataSet wholeData = training `seq` validation `seq` test `seq` (training, validation, test)
     where
       half = length wholeData `quot` 2
       valLen  = 2 * (length wholeData `quot` 10)

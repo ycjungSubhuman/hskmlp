@@ -35,7 +35,7 @@ module Neural(
   {- Activations and loss -}
 
   softmax :: Vector Double -> Vector Double
-  softmax v = (\val -> val / normalizer) `cmap` (exp v)
+  softmax v = normalizer `seq` ((\val -> val / normalizer) `cmap` (exp v))
     where normalizer = sumElements (exp v)
 
   crossEntropy :: Vector Double -> Vector Double -> Double
@@ -118,7 +118,7 @@ module Neural(
 
   -- Train FC neural network 'epoch' times using given examples
   train :: Int -> Double -> [Example] -> Network -> Network
-  train epoch learningRate examples network = (iterate (trainEpoch learningRate examples) network)!!epoch
+  train epoch learningRate examples network = examples `seq` ((iterate (trainEpoch learningRate examples) network)!!epoch)
 
   -- Train FC neural network with examples
   trainEpoch :: Double -> [Example] -> Network -> Network
@@ -133,7 +133,7 @@ module Neural(
 
   -- Prepare Network with input
   feedData :: Vector Double -> Network -> Network
-  feedData input network = case network of
+  feedData input network = input `seq` case network of
     StartLayer d -> StartLayer $ homo input
     HiddenLayer prevLayer weights value -> HiddenLayer (feedData input prevLayer) weights value
     EndLayer prevLayer value loss -> EndLayer (feedData input prevLayer) value loss
@@ -155,7 +155,7 @@ module Neural(
   -- Uses stochastic gradient descent
   backward :: Double -> Vector Double -> Network -> Network
   backward learningRate gt (EndLayer prevLayer value _) =
-    EndLayer (innerBackward prevLayer lastDiff) value loss
+    gt `seq` EndLayer (innerBackward prevLayer lastDiff) value loss
       where
         {-
          - lastDiff is a vector of partial derivatives
