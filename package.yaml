@@ -1,6 +1,6 @@
 name:                homework3
 version:             0.1.0.0
-github:              "ycjungSubhuman/homework3"
+github:              "ycjungSubhuman/hskmlp"
 license:             BSD3
 author:              "Yuchoel Jung"
 maintainer:          "ycjung@postech.ac.kr"
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/ycjungSubhuman/homework3#readme>
+description:         Please see the README on Github at <https://github.com/ycjungSubhuman/hskmlp#readme>
 
 dependencies:
 - base >= 4.7 && < 5
