@@ -27,8 +27,8 @@ module Neural(
     HiddenLayer :: Network -> Matrix Double -> Vector Double -> Network
     -- End layer : softmax layer. consists of three elements
     -- 1. network subset that comes before this layer
-    -- 2. current softmax value (homogeneous)
-    -- 3. current loss of training
+    -- 2. current softmax value
+    -- 3. current loss of training (not used)
     EndLayer :: Network -> Vector Double -> Double -> Network
     deriving (Show)
 
@@ -77,7 +77,7 @@ module Neural(
   -- Derivatives of softmax-crossentropy loss function
   jaLoss t y = y - t
 
-  {- Network handling-}
+  {- Network handling -}
 
   -- Initialize network with random weights and zero values
   -- The first argument is dimension of hidden layers.
